@@ -29,18 +29,21 @@
 #include <boost/bind.hpp>
 
 
+// NetworkTables
+#include <networktables/NetworkTableInstance.h>
+#include <networktables/NetworkTable.h>
 
 namespace gazebo {
 
   class Joint;
   class Entity;
 
-  class GazeboRosMotor : public ModelPlugin {
+  class GazeboRosMotorNT : public ModelPlugin {
 
     public:
 
-      GazeboRosMotor();
-      ~GazeboRosMotor();
+      GazeboRosMotorNT();
+      ~GazeboRosMotorNT();
       void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf);
       void Reset();
 	    bool ValidateParameters();
@@ -70,6 +73,7 @@ namespace gazebo {
 
       // Measurement noise
       double velocity_noise_;
+      double nt_velocity_noise_;
       double supply_voltage_;
 
       // Topic params
@@ -85,6 +89,13 @@ namespace gazebo {
       bool publish_motor_joint_state_;
       double input_;
       double update_rate_;
+
+      // NT params
+      std::string nt_table_entry_;
+      nt::NetworkTableInstance ntInstance;
+
+      std::shared_ptr<nt::NetworkTable> motorTable;
+      nt::NetworkTableEntry voltageCommandEntry, positionEntry, velocityEntry, currentEntry;
 
       // Gearbox
       double gear_ratio_; /// reduction ratio, eg 10.0 means 1/10-th output angular velocity compared to motor inner vel.
@@ -131,6 +142,7 @@ namespace gazebo {
       void motorModelUpdate(double dt, double actual_omega, double current_torque);
       void publishEncoderCount(double m_vel, double dT);
       void publishMotorCurrent();
+      void publishNT();
   };
 
 }

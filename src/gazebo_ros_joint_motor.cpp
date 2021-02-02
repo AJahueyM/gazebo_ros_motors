@@ -1,11 +1,9 @@
 #include <algorithm>
-#include <assert.h>
 #include <ignition/math/Vector3.hh>
 #include <sdf/sdf.hh>
 #include <ros/ros.h>
 
 #include "gazebo_ros_joint_motor/gazebo_ros_joint_motor.h"
-
 namespace gazebo {
 
 // Constructor
