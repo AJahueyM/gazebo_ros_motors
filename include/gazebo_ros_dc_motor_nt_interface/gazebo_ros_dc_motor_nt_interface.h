@@ -89,7 +89,6 @@ namespace gazebo {
       bool publish_motor_joint_state_;
       double input_;
       double update_rate_;
-
       // NT params
       std::string nt_table_entry_;
       nt::NetworkTableInstance ntInstance;

@@ -32,6 +32,7 @@ namespace gazebo {
         this->callback_queue_thread_ = std::thread(std::bind(&GazeboRosMotorNT::QueueThread, this));
 
         // global parameters
+
         gazebo_ros_->getParameter<std::string>(command_topic_, "command_topic", "/motor/voltage_norm");
         gazebo_ros_->getParameter<double>(update_rate_, "update_rate", 100.0);
 
@@ -169,6 +170,7 @@ namespace gazebo {
                 input_ =  std::clamp(notification.value->GetDouble() / 12.0, -1.0, 1.0);
             }
         }, NT_NOTIFY_UPDATE | NT_NOTIFY_NEW);
+
     }
 
     void GazeboRosMotorNT::Reset() {
@@ -456,7 +458,10 @@ namespace gazebo {
         ignition::math::Vector3d applied_torque;
         // TODO: axis as param
         applied_torque.Z() = Km * i_t * gear_ratio_; // motor torque T_ext = K * i * n_gear
-        this->link_->AddRelativeTorque(applied_torque);
+
+            this->link_->AddRelativeTorque(applied_torque);
+
+
     }
 
 // Plugin update function
@@ -464,8 +469,14 @@ namespace gazebo {
         common::Time current_time = parent->GetWorld()->SimTime();
         double seconds_since_last_update = (current_time - last_update_time_).Double();
         double current_output_speed = joint_->GetVelocity(0u);
-        ignition::math::Vector3d current_torque = this->link_->RelativeTorque();
-        double actual_load = current_torque.Z();
+
+
+
+        double actual_load = 0.0;
+        ignition::math::Vector3d current_torque;
+
+        current_torque= this->link_->RelativeTorque();
+        actual_load = current_torque.Z();
 
         motorModelUpdate(seconds_since_last_update, current_output_speed, actual_load);
 
