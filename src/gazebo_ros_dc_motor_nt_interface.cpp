@@ -155,7 +155,10 @@ namespace gazebo {
         dynamic_reconfigure_server_->setCallback(boost::bind(&GazeboRosMotorNT::reconfigureCallBack, this, _1, _2));
         scoped_lock.unlock();
 
+        gazebo_ros_->getParameter<std::string>(joint_axis_, "joint_axis", "z");
         gazebo_ros_->getParameter<std::string>(nt_table_entry_, "nt_table_entry", joint_->GetName());
+
+        boost::to_lower(joint_axis_);
         ntInstance = nt::NetworkTableInstance::GetDefault();
         ntInstance.StartClient("127.0.0.1");
         motorTable = ntInstance.GetTable(parent->GetName() + "/" + nt_table_entry_);
@@ -165,9 +168,9 @@ namespace gazebo {
         velocityEntry = motorTable->GetEntry("Velocity");
         voltageCommandEntry.SetDouble(0.0);
 
-        voltageCommandEntry.AddListener([this] (const nt::EntryNotification& notification){
-            if(notification.value->IsDouble()){
-                input_ =  std::clamp(notification.value->GetDouble() / 12.0, -1.0, 1.0);
+        voltageCommandEntry.AddListener([this](const nt::EntryNotification &notification) {
+            if (notification.value->IsDouble()) {
+                input_ = std::clamp(notification.value->GetDouble() / 12.0, -1.0, 1.0);
             }
         }, NT_NOTIFY_UPDATE | NT_NOTIFY_NEW);
 
@@ -456,10 +459,16 @@ namespace gazebo {
         internal_current_ = i_t;
         internal_omega_ = o_t;
         ignition::math::Vector3d applied_torque;
-        // TODO: axis as param
-        applied_torque.Z() = Km * i_t * gear_ratio_; // motor torque T_ext = K * i * n_gear
 
-            this->link_->AddRelativeTorque(applied_torque);
+        if (joint_axis_ == "x") {
+            applied_torque.X() = Km * i_t * gear_ratio_; // motor torque T_ext = K * i * n_gear
+        } else if (joint_axis_ == "y") {
+            applied_torque.Y() = Km * i_t * gear_ratio_; // motor torque T_ext = K * i * n_gear
+        } else {
+            applied_torque.Z() = Km * i_t * gear_ratio_; // motor torque T_ext = K * i * n_gear
+        }
+
+        this->link_->AddRelativeTorque(applied_torque);
 
 
     }
@@ -468,20 +477,36 @@ namespace gazebo {
     void GazeboRosMotorNT::UpdateChild() {
         common::Time current_time = parent->GetWorld()->SimTime();
         double seconds_since_last_update = (current_time - last_update_time_).Double();
-        double current_output_speed = joint_->GetVelocity(0u);
-
+        double current_output_speed = 0;
 
 
         double actual_load = 0.0;
         ignition::math::Vector3d current_torque;
 
-        current_torque= this->link_->RelativeTorque();
-        actual_load = current_torque.Z();
+        current_torque = this->link_->RelativeTorque();
+
+        if (joint_axis_ == "x") {
+            actual_load = current_torque.X();
+            current_output_speed = joint_->GetChild()->RelativeAngularVel().X();
+        } else if (joint_axis_ == "y") {
+            actual_load = current_torque.Y();
+            current_output_speed = joint_->GetChild()->RelativeAngularVel().Y();
+        } else {
+            actual_load = current_torque.Z();
+            current_output_speed = joint_->GetChild()->RelativeAngularVel().Z();
+        }
 
         motorModelUpdate(seconds_since_last_update, current_output_speed, actual_load);
 
         if (seconds_since_last_update > update_period_) {
-            publishWheelJointState(current_output_speed, current_torque.Z());
+            if (joint_axis_ == "x") {
+                publishWheelJointState(current_output_speed, current_torque.X());
+            } else if (joint_axis_ == "y") {
+                publishWheelJointState(current_output_speed, current_torque.Y());
+            } else {
+                publishWheelJointState(current_output_speed, current_torque.Z());
+            }
+
             publishMotorCurrent();
             auto dist = std::bind(std::normal_distribution<double>{current_output_speed, velocity_noise_},
                                   std::mt19937(std::random_device{}()));
@@ -524,11 +549,10 @@ namespace gazebo {
         positionEntry.SetDouble(encoder_counter_);
         currentEntry.SetDouble(internal_current_);
         double cleanRotorVel = internal_omega_ / (2 * M_PI) * encoder_pulses_per_revolution_;
-        auto dist = std::bind(std::normal_distribution<double>{cleanRotorVel, nt_velocity_noise_},
-                              std::mt19937(std::random_device{}()));
-        double noisy = dist();
 
-        velocityEntry.SetDouble(noisy);
+        factorMean(cleanRotorVel);
+
+        velocityEntry.SetDouble(cleanRotorVel);
     }
 
     GZ_REGISTER_MODEL_PLUGIN (GazeboRosMotorNT)

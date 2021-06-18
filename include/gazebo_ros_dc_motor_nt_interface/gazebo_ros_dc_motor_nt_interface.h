@@ -33,6 +33,12 @@
 #include <networktables/NetworkTableInstance.h>
 #include <networktables/NetworkTable.h>
 
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
+#include <boost/accumulators/framework/accumulator_set.hpp>
+using namespace boost::accumulators;
+
+
 namespace gazebo {
 
   class Joint;
@@ -89,6 +95,7 @@ namespace gazebo {
       bool publish_motor_joint_state_;
       double input_;
       double update_rate_;
+      std::string joint_axis_;
       // NT params
       std::string nt_table_entry_;
       nt::NetworkTableInstance ntInstance;
@@ -114,6 +121,9 @@ namespace gazebo {
       // Encoder model
       int encoder_counter_;
       int encoder_pulses_per_revolution_;
+
+      accumulator_set<double, stats<tag::rolling_mean> > factorMean {tag::rolling_window::window_size = 1};
+
 
       // Callback Queue
       ros::CallbackQueue queue_;
